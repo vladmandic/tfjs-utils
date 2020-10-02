@@ -1,0 +1,16 @@
+{
+  "name": "detector",
+  "version": "0.0.1",
+  "description": "",
+  "main": "detector.js",
+  "scripts": {
+    "start": "node --trace-warnings --trace-uncaught --unhandled-rejections=warn --stack-trace-limit=50 --no-deprecation ./detector.js"
+  },
+  "author": "Vladimir Mandic <mandic00@live.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@tensorflow/tfjs-node": "../tfjs/tfjs-node",
+    "@vladmandic/pilogger": "^0.2.2",
+    "canvas": "^2.6.1"
+  }
+}
