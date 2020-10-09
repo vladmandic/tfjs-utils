@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "",
   "main": "detector.js",
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "scripts": {
     "start": "node --trace-warnings --trace-uncaught --unhandled-rejections=warn --stack-trace-limit=50 --no-deprecation ./detector.js"
   },
@@ -10,7 +13,14 @@
   "license": "MIT",
   "dependencies": {
     "@tensorflow/tfjs-node": "../tfjs/tfjs-node",
+    "@tensorflow/tfjs-node-gpu": "../tfjs/tfjs-node-gpu/",
     "@vladmandic/pilogger": "^0.2.2",
     "canvas": "^2.6.1"
+  },
+  "devDependencies": {
+    "eslint": "^7.10.0",
+    "eslint-config-airbnb-base": "^14.2.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-node": "^11.1.0"
   }
 }
