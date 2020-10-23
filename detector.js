@@ -1,23 +1,24 @@
 const fs = require('fs');
 const path = require('path');
 const log = require('@vladmandic/pilogger');
-// const tf = require('@tensorflow/tfjs-node-gpu');
 const tf = require('@tensorflow/tfjs-node');
 const canvas = require('canvas');
 
 // app options
-const debug = false;
+const debug = true;
 const imgInput = 'inputs/';
 const imgOutput = 'outputs/';
 const outSize = 1920; // set to 0 to avoid image resizing
+const scaleOutput = true;
+const divFactor = 255.0;
 
 // model options
-const minScore = 0.2;
+const minScore = 0.35;
 const maxResults = 50;
 const iouThreshold = 0.1;
 
 const coco = JSON.parse(fs.readFileSync('./coco.json'));
-// const openimages = JSON.parse(fs.readFileSync('./openimages.json'));
+const openimages = JSON.parse(fs.readFileSync('./openimages.json'));
 const models = [];
 let performances = {};
 
@@ -30,7 +31,7 @@ function perf(model, time) {
   performances[model].max = performances[model].max > t ? performances[model].max : t;
 }
 
-function rect({ drawCanvas = null, x = 0, y = 0, width = 0, height = 0, radius = 8, lineWidth = 2, color = 'white', title = null, font = 'small-caps 14px "Segoe UI"' }) {
+function rect({ drawCanvas = null, x = 0, y = 0, width = 0, height = 0, radius = 8, lineWidth = 2, color = 'white', title = null, font = 'small-caps 28px "Segoe UI"' }) {
   const ctx = drawCanvas.getContext('2d');
   ctx.lineWidth = lineWidth;
   ctx.beginPath();
@@ -46,10 +47,10 @@ function rect({ drawCanvas = null, x = 0, y = 0, width = 0, height = 0, radius =
   ctx.closePath();
   ctx.strokeStyle = color;
   ctx.stroke();
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 2;
   ctx.fillStyle = color;
   ctx.font = font;
-  if (title) ctx.fillText(title, x + 4, y + 12);
+  if (title) ctx.fillText(title, x + 4, y + 24);
 }
 
 function getTensorFromImage(image, dtype) {
@@ -66,13 +67,13 @@ function getTensorFromImage(image, dtype) {
   let imageT;
   if ((dtype === 'float16') || (dtype === 'float32') || (dtype === 'DT_FLOAT')) {
     const casted = tf.cast(expanded, 'float32');
-    imageT = tf.mul(casted, [1.0 / 255.0]);
+    imageT = tf.mul(casted, [1.0 / divFactor]);
     tf.dispose(casted);
   } else {
     imageT = tf.clone(expanded);
   }
   // return image tensor
-  imageT.file = path;
+  imageT.file = image;
   if (debug) log.info('Image:', imageT.file, bufferT.size, 'bytes with shape:', imageT.shape, 'dtype:', dtype);
   tf.dispose(expanded);
   tf.dispose(bufferT);
@@ -93,7 +94,7 @@ async function saveProcessedImage(inImage, outImage, data) {
     rect({ drawCanvas: c, x: 0, y: 0, width: 0, height: 0, title: data[0].model });
     // draw all detected objects
     for (const obj of data) {
-      rect({ drawCanvas: c, x: obj.rect.x / scale, y: obj.rect.y / scale, width: obj.rect.width / scale, height: obj.rect.height / scale, title: `${Math.round(100 * obj.score)}% ${obj.class}` });
+      rect({ drawCanvas: c, x: obj.rect.x / scale, y: obj.rect.y / scale, width: obj.rect.width / scale, height: obj.rect.height / scale, title: `${Math.round(100 * obj.score)}% ${obj.class} #${obj.classId}` });
     }
     // write canvas to jpeg
     const out = fs.createWriteStream(outImage);
@@ -110,11 +111,13 @@ async function saveProcessedImage(inImage, outImage, data) {
   });
 }
 
-async function processPrediction(res, image, model, labels) {
+async function processPrediction(res, image, model) {
   // get results according to map
   const classes = await res[model.map['detection_classes']].data();
   const scores = await res[model.map['detection_scores']].data();
   const boxes = await res[model.map['detection_boxes']].array();
+  const numClasses = Math.max(...classes);
+  const labels = numClasses <= 100 ? coco : openimages;
   // sort & filter results
   const overlapT = await tf.image.nonMaxSuppressionAsync(boxes[0], scores, maxResults, iouThreshold, minScore);
   const overlap = await overlapT.data();
@@ -131,10 +134,10 @@ async function processPrediction(res, image, model, labels) {
       bbox: boxes[0][id].map((a) => Math.trunc(10000 * a) / 10000),
       model: model.name,
       rect: {
-        x: Math.trunc(boxes[0][id][1] * image.shape[2]),
-        y: Math.trunc(boxes[0][id][0] * image.shape[1]),
-        width: Math.trunc((boxes[0][id][3] - boxes[0][id][1]) * image.shape[2]),
-        height: Math.trunc((boxes[0][id][2] - boxes[0][id][0]) * image.shape[1]),
+        x: Math.trunc(boxes[0][id][1] * (scaleOutput ? image.shape[2] : 1)),
+        y: Math.trunc(boxes[0][id][0] * (scaleOutput ? image.shape[1] : 1)),
+        width: Math.trunc((boxes[0][id][3] - boxes[0][id][1]) * (scaleOutput ? image.shape[2] : 1)),
+        height: Math.trunc((boxes[0][id][2] - boxes[0][id][0]) * (scaleOutput ? image.shape[1] : 1)),
       },
     });
   }
@@ -155,7 +158,7 @@ async function processSavedModel(image, modelPath) {
     try {
       models[modelPath] = await tf.node.loadSavedModel(modelPath, tags, signature);
     } catch (err) {
-      log.error('Error loading graph model:', modelPath, err.message);
+      log.error('Error loading graph model:', modelPath, err.message, err);
       models[modelPath] = modelPath;
       return;
     }
@@ -178,7 +181,7 @@ async function processSavedModel(image, modelPath) {
   }
   const t1 = process.hrtime.bigint();
   // parse outputs
-  const parsed = resT ? await processPrediction(resT, imageT, models[modelPath], coco) : [];
+  const parsed = resT ? await processPrediction(resT, imageT, models[modelPath]) : [];
   if (parsed.length > 0) perf(modelPath, t1 - t0);
   // free up memory
   tf.dispose(imageT);
@@ -196,7 +199,7 @@ async function processGraphModel(image, modelPath) {
     try {
       models[modelPath] = await tf.loadGraphModel(`file://${path.join(modelPath, '/model.json')}`);
     } catch (err) {
-      log.error('Error loading graph model:', modelPath, err.message);
+      log.error('Error loading graph model:', modelPath, err.message, err);
       models[modelPath] = modelPath;
       return;
     }
@@ -231,49 +234,72 @@ async function processGraphModel(image, modelPath) {
   // save processed image
   if (parsed.length > 0) await saveProcessedImage(image, `${imgOutput}${path.basename(image)}-${path.basename(modelPath)}.jpg`, parsed);
   // results
-  if (parsed.length > 0) log.data('Exec:', image, modelPath, Math.trunc(parseInt(t1 - t0) / 1000 / 1000), 'ms', 'detected', parsed.length, 'objects');
+  log.data('Exec:', image, modelPath, Math.trunc(parseInt(t1 - t0) / 1000 / 1000), 'ms', 'detected', parsed.length || 0, 'objects');
 }
 
-async function main() {
-  log.header();
-  log.info('TensorFlow/JS Version', tf.version_core);
-  // await tf.setBackend('tensorflow'); // 'tensorflow' is tfjs-node backend mapped to libtensorflow.so
-  await tf.enableProdMode();
-  await tf.ENV.set('DEBUG', false);
-  // tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', true);
-  await tf.ready();
-  log.info('TensorFlow/JS Backend', tf.getBackend());
-  log.info('TensorFlow/JS Flags', tf.ENV.flags);
+// eslint-disable-next-line no-unused-vars
+async function testAll({ graph = true, saved = true, single = false }) {
   // enumerate all images in input and run prediction loop for each model
   const images = fs.readdirSync(imgInput);
   log.info('Images: ', images.length);
   // enumerate all local models
   const modelsSaved = fs.readdirSync('models/saved/');
   const modelsGraph = fs.readdirSync('models/graph/');
-  log.info('Models: Saved: ', modelsSaved.length, 'Graph:', modelsGraph.length);
-
+  log.info('Models: Saved:', modelsSaved.length, 'Graph:', modelsGraph.length);
   // loop through all images and saved models
-  performances = {};
-  for (const image of images) {
-    for (const model of modelsSaved) await processSavedModel(`inputs/${image}`, `models/saved/${model}`);
+  if (saved) {
+    performances = {};
+    if (single) {
+      for (const model of modelsSaved) await processSavedModel('inputs/cars.jpg', `models/saved/${model}`);
+    } else {
+      for (const image of images) {
+        for (const model of modelsSaved) await processSavedModel(`inputs/${image}`, `models/saved/${model}`);
+      }
+    }
+    // print performance info and dispose models
+    for (const [model, data] of Object.entries(performances)) log.info(model, data);
+    for (const model in models) tf.dispose(model);
   }
-  // print performance info and dispose models
-  for (const [model, data] of Object.entries(performances)) log.info(model, data);
-  for (const model in models) tf.dispose(model);
+  if (graph) {
+    // loop through all images and graph models
+    performances = {};
+    if (single) {
+      for (const model of modelsSaved) await processGraphModel('inputs/cars.jpg', `models/graph/${model}`);
+    } else {
+      for (const image of images) {
+        for (const model of modelsGraph) await processGraphModel(`inputs/${image}`, `models/graph/${model}`);
+      }
+    }
+    // print performance info and dispose models
+    for (const [model, data] of Object.entries(performances)) log.info(model, data);
+    for (const model in models) tf.dispose(model);
+  }
+}
 
-  // loop through all images and graph models
+// eslint-disable-next-line no-unused-vars
+async function testSingle() {
   performances = {};
-  for (const image of images) {
-    for (const model of modelsGraph) await processGraphModel(`inputs/${image}`, `models/graph/${model}`);
-  }
-  // print performance info and dispose models
+
+  await processSavedModel('inputs/bar.jpg', 'models/saved/centernet-resnet-50-v2');
+  await processGraphModel('inputs/bar.jpg', 'models/graph/centernet-resnet-50-v2');
+
   for (const [model, data] of Object.entries(performances)) log.info(model, data);
   for (const model in models) tf.dispose(model);
 }
 
-main();
+async function main() {
+  log.header();
+  log.info('TensorFlow/JS Version', tf.version_core);
+  await tf.setBackend('tensorflow'); // 'tensorflow' is tfjs-node backend mapped to libtensorflow.so
+  await tf.enableProdMode();
+  await tf.ENV.set('DEBUG', false);
+  tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', true);
+  await tf.ready();
+  log.info('TensorFlow/JS Backend', tf.getBackend());
+  log.info('TensorFlow/JS Flags', tf.ENV.flags);
 
-// tensorflowjs_converter --input_format=tf_saved_model --output_format=tfjs_graph_model --strip_debug_ops=* --control_flow_v2=* --skip_op_check <src> <tgt>
-// tensorflowjs_converter --input_format=tf_saved_model --output_format=tfjs_graph_model --strip_debug_ops=* --control_flow_v2=* --skip_op_check --quantize_float16 <src> <tgt>
-// tensorflowjs_converter --input_format=tf_saved_model --output_format=tfjs_graph_model --strip_debug_ops=* --control_flow_v2=* --skip_op_check --quantize_uin16 <src> <tgt>
-// tensorflowjs_converter --input_format=tf_saved_model --output_format=tfjs_graph_model --strip_debug_ops=* --control_flow_v2=* --skip_op_check --quantize_uint8 <src> <tgt>
+  // await testAll({ graph: false, saved: true, single: true });
+  await testSingle();
+}
+
+main();
