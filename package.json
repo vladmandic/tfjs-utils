@@ -13,7 +13,6 @@
   "license": "MIT",
   "dependencies": {
     "@tensorflow/tfjs-node": "../tfjs/tfjs-node",
-    "@tensorflow/tfjs-node-gpu": "../tfjs/tfjs-node-gpu/",
     "@vladmandic/pilogger": "^0.2.2",
     "canvas": "^2.6.1"
   },

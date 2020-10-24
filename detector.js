@@ -116,6 +116,7 @@ async function processPrediction(res, image, model) {
   const classes = await res[model.map['detection_classes']].data();
   const scores = await res[model.map['detection_scores']].data();
   const boxes = await res[model.map['detection_boxes']].array();
+  console.log(classes, scores, boxes);
   const numClasses = Math.max(...classes);
   const labels = numClasses <= 100 ? coco : openimages;
   // sort & filter results
@@ -175,7 +176,8 @@ async function processSavedModel(image, modelPath) {
   const t0 = process.hrtime.bigint();
   let resT;
   try {
-    resT = models[modelPath].predict ? await models[modelPath].predict(imageT, { score: minScore, iou: iouThreshold, topk: maxResults }) : null;
+    // resT = models[modelPath].predict ? await models[modelPath].predict(imageT, { score: minScore, iou: iouThreshold, topk: maxResults }) : null;
+    resT = await models[modelPath].executeAsync(imageT);
   } catch (err) {
     log.error('Error executing graph model:', modelPath, err.message);
   }
@@ -206,9 +208,12 @@ async function processGraphModel(image, modelPath) {
     // static model map since graph model looses signature info
     const sig = models[modelPath].executor._signature;
     models[modelPath].map = {};
-    models[modelPath].map['detection_classes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'Identity_2:0');
-    models[modelPath].map['detection_scores'] = Object.keys(sig['outputs']).findIndex((a) => a === 'Identity_4:0');
-    models[modelPath].map['detection_boxes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'Identity_1:0');
+    models[modelPath].map['detection_classes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'detection_classes:0');
+    models[modelPath].map['detection_scores'] = Object.keys(sig['outputs']).findIndex((a) => a === 'detection_scores:0');
+    models[modelPath].map['detection_boxes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'detection_boxes:0');
+    // models[modelPath].map['detection_classes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'Identity_2:0');
+    // models[modelPath].map['detection_scores'] = Object.keys(sig['outputs']).findIndex((a) => a === 'Identity_4:0');
+    // models[modelPath].map['detection_boxes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'Identity_1:0');
     models[modelPath].dtype = Object.values(sig['inputs'])[0]['dtype'];
     models[modelPath].name = modelPath;
     if (debug) log.data('Model signature:', sig);
@@ -280,8 +285,8 @@ async function testAll({ graph = true, saved = true, single = false }) {
 async function testSingle() {
   performances = {};
 
-  await processSavedModel('inputs/bar.jpg', 'models/saved/centernet-resnet-50-v2');
-  await processGraphModel('inputs/bar.jpg', 'models/graph/centernet-resnet-50-v2');
+  // await processSavedModel('inputs/bar.jpg', 'models/saved/faster-rcnn-inception-resnet-v2-atrous-v4-oi');
+  await processGraphModel('inputs/bar.jpg', 'models/graph/openimages-faster-rcnn-inception-resnet-v2-atrous-v4');
 
   for (const [model, data] of Object.entries(performances)) log.info(model, data);
   for (const model in models) tf.dispose(model);
