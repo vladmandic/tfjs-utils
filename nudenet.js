@@ -21,8 +21,7 @@ const options = {
   iouThreshold: 0.5,
 };
 
-const models = [];
-
+// model classes
 const labels = {
   0: { id: 0, displayName: 'exposed anus' },
   1: { id: 1, displayName: 'exposed armpits' },
@@ -42,10 +41,14 @@ const labels = {
   15: { id: 15, displayName: 'exposed male breast' },
 };
 
+// custom landmark definitions of what is a person, sexy, nude
 const labelPerson = [6, 7];
 const labelSexy = [1, 2, 3, 4, 8, 9, 10, 15];
 const labelNude = [0, 5, 11, 12, 13];
 
+const models = [];
+
+// draw rect with rounded corners
 function rect({ drawCanvas = null, x = 0, y = 0, width = 0, height = 0, radius = 8, lineWidth = 2, color = 'white', title = null, font = 'small-caps 28px "Segoe UI"' }) {
   const ctx = drawCanvas.getContext('2d');
   ctx.lineWidth = lineWidth;
@@ -68,17 +71,17 @@ function rect({ drawCanvas = null, x = 0, y = 0, width = 0, height = 0, radius =
   if (title) ctx.fillText(title, x + 4, y + 24);
 }
 
+// blur par of canvas by redrawing it with smaller resulution
 function blur({ drawCanvas = null, left = 0, top = 0, width = 0, height = 0 }) {
   const blurCanvas = new canvas.Canvas(width / image.blurRadius, height / image.blurRadius);
   const blurCtx = blurCanvas.getContext('2d');
   blurCtx.imageSmoothingEnabled = true;
-  // blurCtx.drawImage(drawCanvas, 0, 0, width / image.blurRadius, height / image.blurRadius);
-  // drawImage(image: Canvas | Image, sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number): void
   blurCtx.drawImage(drawCanvas, left, top, width, height, 0, 0, width / image.blurRadius, height / image.blurRadius);
   const canvasCtx = drawCanvas.getContext('2d');
   canvasCtx.drawImage(blurCanvas, left, top, width, height);
 }
 
+// read image file and prepare tensor for further processing
 function getTensorFromImage(imageFile) {
   if (!fs.existsSync(imageFile)) {
     log.error('Not found:', imageFile);
@@ -95,6 +98,7 @@ function getTensorFromImage(imageFile) {
   return imageT;
 }
 
+// create output jpeg after processing
 async function saveProcessedImage(inImage, outImage, data) {
   if (!data) return false;
   return new Promise(async (resolve) => {
@@ -125,8 +129,9 @@ async function saveProcessedImage(inImage, outImage, data) {
   });
 }
 
+// parse prediction data
 async function processPrediction(res, imageT) {
-  // get results according to map
+  // hack to indetify outputs as converted graph model loose output names so i identify what is what by output type and shape
   const classesT = res.find((a) => a.dtype === 'int32');
   const scoresT = res.find((a) => a.shape.length === 2);
   const boxesT = res.find((a) => a.shape.length === 3);
@@ -134,17 +139,19 @@ async function processPrediction(res, imageT) {
   const scores = await scoresT.data();
   const boxes = await boxesT.array();
   // sort & filter results
-  const overlapT = await tf.image.nonMaxSuppressionAsync(boxes[0], scores, options.maxResults, options.iouThreshold, options.minScore);
-  const overlap = await overlapT.data();
-  tf.dispose(overlapT);
+  const nmsT = await tf.image.nonMaxSuppressionAsync(boxes[0], scores, options.maxResults, options.iouThreshold, options.minScore);
+  const nms = await nmsT.data();
+  tf.dispose(nmsT);
   const detected = [];
   // create result object
-  for (const i in overlap) {
+  for (const i in nms) {
     const id = parseInt(i);
     detected.push({
       score: Math.trunc(10000 * scores[i]) / 10000,
       classId: classes[id],
+      // lookup classes
       class: labels[classes[id]]?.displayName,
+      // convert box from x0,y0,x1,y1 to x,y,width,heigh
       bbox: {
         x: Math.trunc(boxes[0][id][0]),
         y: Math.trunc(boxes[0][id][1]),
@@ -155,6 +162,7 @@ async function processPrediction(res, imageT) {
   }
   const obj = { detected };
   obj.image = { file: imageT.file, width: imageT.shape[2], height: imageT.shape[1] };
+  // add custom landmarks
   obj.person = detected.filter((a) => labelPerson.includes(a.classId));
   obj.sexy = detected.filter((a) => labelSexy.includes(a.classId));
   obj.nude = detected.filter((a) => labelNude.includes(a.classId));
@@ -162,6 +170,7 @@ async function processPrediction(res, imageT) {
   return obj;
 }
 
+// load saved model and run inference
 async function processSavedModel(modelPath, inImage, outImage) {
   if (!models[modelPath]) {
     if (debug) log.state('Loading saved model:', modelPath);
@@ -194,6 +203,7 @@ async function processSavedModel(modelPath, inImage, outImage) {
   return res;
 }
 
+// load graph model and run inference
 async function processGraphModel(modelPath, inImage, outImage) {
   if (!models[modelPath]) {
     if (debug) log.state('Loading graph model:', modelPath);
@@ -226,20 +236,35 @@ async function processGraphModel(modelPath, inImage, outImage) {
   return res;
 }
 
+// main function
 async function main() {
   log.header();
 
+  if (process.argv.length !== 5) {
+    log.error(`Usage: ${process.argv[1]} <saved|graph> <input-image> <output-image>`);
+    log.info('To change model and image options, modify objects in header of this file');
+    log.info('Fetch saved model: ');
+    log.info('  mkdir models/ mkdir models/saved; curl -L https://github.com/notAI-tech/NudeNet/releases/download/v0/detector_v2_default_checkpoint_tf.tar | tar -C models/saved -x');
+    log.info('Convert graph model: ');
+    log.info('  tensorflowjs_converter --strip_debug_ops=* --control_flow_v2=* --quantize_float16=* models/saved/ models/graph/');
+    return;
+  }
+
   await tf.enableProdMode();
   await tf.ENV.set('DEBUG', false);
-  // await tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', true);
   await tf.ready();
 
   if (debug) log.info('TensorFlow/JS Version', tf.version_core);
   if (debug) log.info('TensorFlow/JS Backend', tf.getBackend());
   if (debug) log.info('TensorFlow/JS Flags', tf.ENV.flags);
 
-  await processSavedModel('models/saved/nudenet', 'inputs/nude1.jpg', 'outputs/nude1-saved.jpg');
-  await processGraphModel('file://models/graph/nudenet/model.json', 'inputs/nude2.jpg', 'outputs/nude2-graph.jpg');
+  const input = process.argv[3];
+  const output = process.argv[4];
+  switch (process.argv[2]) {
+    case 'saved': await processSavedModel('models/saved/nudenet', input, output); break;
+    case 'graph': await processGraphModel('file://models/graph/nudenet/model.json', input, output); break;
+    default: log.error('Unrecognized operation type');
+  }
 
   for (const model in models) tf.dispose(model);
 }
