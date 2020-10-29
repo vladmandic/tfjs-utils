@@ -174,24 +174,27 @@ async function processPrediction(res, imageT) {
 async function processSavedModel(modelPath, inImage, outImage) {
   if (!models[modelPath]) {
     if (debug) log.state('Loading saved model:', modelPath);
-    // const meta = await tf.node.getMetaGraphsFromSavedModel(modelPath);
+    const meta = await tf.node.getMetaGraphsFromSavedModel(modelPath);
+    log.data(meta);
     try {
       models[modelPath] = await tf.node.loadSavedModel(modelPath, ['serve'], 'predict');
       models[modelPath].path = modelPath;
     } catch (err) {
-      log.error('Error loading graph model:', modelPath, err.message);
+      log.error('Error loading graph model:', modelPath, err.message, err.stack);
       return null;
     }
   }
   // get image tensor
   const imageT = getTensorFromImage(inImage);
   // run prediction
+  const t0 = process.hrtime.bigint();
   let resT;
   try {
     resT = models[modelPath].predict ? await models[modelPath].predict(imageT) : null;
   } catch (err) {
     log.error('Error executing graph model:', modelPath, err.message);
   }
+  const t1 = process.hrtime.bigint();
   // parse outputs
   const res = resT ? await processPrediction(resT, imageT, models[modelPath]) : [];
   // free up memory
@@ -199,7 +202,7 @@ async function processSavedModel(modelPath, inImage, outImage) {
   for (const tensorT of resT) tensorT.dispose();
   // save processed image and return result
   await saveProcessedImage(inImage, outImage, res);
-  log.state(`Exec: model:${modelPath} input:${inImage} output:${outImage} objects:`, res.detected.length);
+  log.state(`Exec: model:${modelPath} input:${inImage} output:${outImage} objects:`, res.detected.length, 'in:', Math.trunc(parseInt(t1 - t0) / 1000 / 1000), 'ms');
   return res;
 }
 
@@ -261,7 +264,8 @@ async function main() {
   const input = process.argv[3];
   const output = process.argv[4];
   switch (process.argv[2]) {
-    case 'saved': await processSavedModel('models/saved/nudenet', input, output); break;
+    // models/saved/nudenet
+    case 'saved': await processSavedModel('../nudenet/saved', input, output); break;
     case 'graph': await processGraphModel('file://models/graph/nudenet/model.json', input, output); break;
     default: log.error('Unrecognized operation type');
   }
