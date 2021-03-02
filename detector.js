@@ -6,6 +6,7 @@ const canvas = require('canvas');
 
 // app options
 const debug = true;
+const profile = false;
 const imgInput = 'inputs/';
 const imgOutput = 'outputs/';
 const outSize = 1920; // set to 0 to avoid image resizing
@@ -17,8 +18,8 @@ const minScore = 0.35;
 const maxResults = 50;
 const iouThreshold = 0.1;
 
-const coco = JSON.parse(fs.readFileSync('./coco.json'));
-const openimages = JSON.parse(fs.readFileSync('./openimages.json'));
+const coco = JSON.parse(fs.readFileSync('./coco.json').toString());
+const openimages = JSON.parse(fs.readFileSync('./openimages.json').toString());
 const models = [];
 let performances = {};
 
@@ -94,7 +95,7 @@ async function saveProcessedImage(inImage, outImage, data) {
     rect({ drawCanvas: c, x: 0, y: 0, width: 0, height: 0, title: data[0].model });
     // draw all detected objects
     for (const obj of data) {
-      rect({ drawCanvas: c, x: obj.rect.x / scale, y: obj.rect.y / scale, width: obj.rect.width / scale, height: obj.rect.height / scale, title: `${Math.round(100 * obj.score)}% ${obj.class} #${obj.classId}` });
+      rect({ drawCanvas: c, x: obj.rect.x / scale, y: obj.rect.y / scale, width: obj.rect.width / scale, height: obj.rect.height / scale, title: `${Math.round(100 * obj.score)}% ${obj.className} #${obj.classId}` });
     }
     // write canvas to jpeg
     const out = fs.createWriteStream(outImage);
@@ -113,10 +114,9 @@ async function saveProcessedImage(inImage, outImage, data) {
 
 async function processPrediction(res, image, model) {
   // get results according to map
-  const classes = await res[model.map['detection_classes']].data();
   const scores = await res[model.map['detection_scores']].data();
   const boxes = await res[model.map['detection_boxes']].array();
-  console.log(classes, scores, boxes);
+  const classes = model.map['detection_classes'] !== -1 ? await res[model.map['detection_classes']].data() : [];
   const numClasses = Math.max(...classes);
   const labels = numClasses <= 100 ? coco : openimages;
   // sort & filter results
@@ -127,11 +127,12 @@ async function processPrediction(res, image, model) {
   // create result object
   for (const i in overlap) {
     const id = parseInt(i);
+    const className = classes.length > 0 ? (labels[classes[id]]?.displayName || labels[id]?.displayName || `UNKNOWN:${id}`) : '';
     results.push({
       image: { file: image.file, width: image.shape[2], height: image.shape[1] },
       score: Math.trunc(10000 * scores[i]) / 10000,
-      classId: classes[id],
-      class: labels[classes[id]]?.displayName || labels[id]?.displayName || `UNKNOWN:${id}`,
+      classId: classes.length > 0 ? classes[id] : 0,
+      className,
       bbox: boxes[0][id].map((a) => Math.trunc(10000 * a) / 10000),
       model: model.name,
       rect: {
@@ -176,8 +177,13 @@ async function processSavedModel(image, modelPath) {
   const t0 = process.hrtime.bigint();
   let resT;
   try {
-    // resT = models[modelPath].predict ? await models[modelPath].predict(imageT, { score: minScore, iou: iouThreshold, topk: maxResults }) : null;
-    resT = await models[modelPath].executeAsync(imageT);
+    if (profile) {
+      const profileData = await tf.profile(() => models[modelPath].predict(imageT));
+      resT = profileData.result;
+      // console.log(profile);
+    } else {
+      resT = await models[modelPath].predict(imageT);
+    }
   } catch (err) {
     log.error('Error executing graph model:', modelPath, err.message);
   }
@@ -186,12 +192,12 @@ async function processSavedModel(image, modelPath) {
   const parsed = resT ? await processPrediction(resT, imageT, models[modelPath]) : [];
   if (parsed.length > 0) perf(modelPath, t1 - t0);
   // free up memory
-  tf.dispose(imageT);
-  tf.dispose(resT);
+  imageT?.dispose();
+  resT.dispose();
   // save processed image
   if (parsed.length > 0) await saveProcessedImage(image, `${imgOutput}${path.basename(image)}-${path.basename(modelPath)}.jpg`, parsed);
   // results
-  if (parsed.length > 0) log.data('Exec:', image, modelPath, Math.trunc(parseInt(t1 - t0) / 1000 / 1000), 'ms', 'detected', parsed.length, 'objects');
+  if (parsed.length > 0) log.data('Exec:', image, modelPath, Math.trunc(parseInt((t1 - t0).toString()) / 1000 / 1000), 'ms', 'detected', parsed.length, 'objects');
 }
 
 async function processGraphModel(image, modelPath) {
@@ -205,16 +211,17 @@ async function processGraphModel(image, modelPath) {
       models[modelPath] = modelPath;
       return;
     }
+    if (debug) log.info('Memory:', tf.memory());
     // static model map since graph model looses signature info
     const sig = models[modelPath].executor._signature;
+    log.data('sig', sig);
     models[modelPath].map = {};
     models[modelPath].map['detection_classes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'detection_classes:0');
-    models[modelPath].map['detection_scores'] = Object.keys(sig['outputs']).findIndex((a) => a === 'detection_scores:0');
-    models[modelPath].map['detection_boxes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'detection_boxes:0');
-    // models[modelPath].map['detection_classes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'Identity_2:0');
-    // models[modelPath].map['detection_scores'] = Object.keys(sig['outputs']).findIndex((a) => a === 'Identity_4:0');
-    // models[modelPath].map['detection_boxes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'Identity_1:0');
-    models[modelPath].dtype = Object.values(sig['inputs'])[0]['dtype'];
+    // models[modelPath].map['detection_scores'] = Object.keys(sig['outputs']).findIndex((a) => a === 'detection_scores:0');
+    // models[modelPath].map['detection_boxes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'detection_boxes:0');
+    models[modelPath].map['detection_scores'] = Object.keys(sig['outputs']).findIndex((a) => a === 'scores');
+    models[modelPath].map['detection_boxes'] = Object.keys(sig['outputs']).findIndex((a) => a === 'boxes');
+    models[modelPath].dtype = sig['inputs'] ? Object.values(sig['inputs'])[0]['dtype'] : 'int8';
     models[modelPath].name = modelPath;
     if (debug) log.data('Model signature:', sig);
     if (debug) log.data('Model output map:', models[modelPath].map);
@@ -225,21 +232,27 @@ async function processGraphModel(image, modelPath) {
   const t0 = process.hrtime.bigint();
   let resT;
   try {
-    resT = models[modelPath].executeAsync ? await models[modelPath].executeAsync(imageT) : null;
+    if (profile) {
+      const profileData = await tf.profile(() => models[modelPath].executeAsync(imageT));
+      resT = profileData.result;
+      log.data(profileData);
+    } else {
+      resT = await models[modelPath].executeAsync(imageT);
+    }
   } catch (err) {
     log.error('Error executing graph model:', modelPath, err.message);
   }
   const t1 = process.hrtime.bigint();
   // parse outputs
-  const parsed = resT ? await processPrediction(resT, imageT, models[modelPath], coco) : [];
+  const parsed = resT ? await processPrediction(resT, imageT, models[modelPath]) : [];
   if (parsed.length > 0) perf(modelPath, t1 - t0);
   // free up memory
-  tf.dispose(imageT);
-  tf.dispose(resT);
+  imageT?.dispose();
+  resT.forEach((t) => t.dispose());
   // save processed image
   if (parsed.length > 0) await saveProcessedImage(image, `${imgOutput}${path.basename(image)}-${path.basename(modelPath)}.jpg`, parsed);
   // results
-  log.data('Exec:', image, modelPath, Math.trunc(parseInt(t1 - t0) / 1000 / 1000), 'ms', 'detected', parsed.length || 0, 'objects');
+  log.data('Exec:', image, modelPath, Math.trunc(parseInt((t1 - t0).toString()) / 1000 / 1000), 'ms', 'detected', parsed.length || 0, 'objects');
 }
 
 // eslint-disable-next-line no-unused-vars
@@ -285,8 +298,9 @@ async function testAll({ graph = true, saved = true, single = false }) {
 async function testSingle() {
   performances = {};
 
-  // await processSavedModel('inputs/bar.jpg', 'models/saved/faster-rcnn-inception-resnet-v2-atrous-v4-oi');
-  await processGraphModel('inputs/bar.jpg', 'models/graph/openimages-faster-rcnn-inception-resnet-v2-atrous-v4');
+  // await processSavedModel('inputs/bikes.jpg', 'models/saved/faster-rcnn-inception-resnet-v2-atrous-v4-oi');
+  // await processGraphModel('inputs/bikes.jpg', 'models/graph/openimages-faster-rcnn-inception-resnet-v2-atrous-v4');
+  await processGraphModel('inputs/people.jpg', 'models/saved/faceboxes/graph-f16');
 
   for (const [model, data] of Object.entries(performances)) log.info(model, data);
   for (const model in models) tf.dispose(model);
@@ -301,7 +315,7 @@ async function main() {
   tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', true);
   await tf.ready();
   log.info('TensorFlow/JS Backend', tf.getBackend());
-  log.info('TensorFlow/JS Flags', tf.ENV.flags);
+  log.info('TensorFlow/JS Flags', tf.env().getFlags());
 
   // await testAll({ graph: false, saved: true, single: true });
   await testSingle();

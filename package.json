@@ -12,13 +12,13 @@
   "author": "Vladimir Mandic <mandic00@live.com>",
   "license": "MIT",
   "dependencies": {
-    "@tensorflow/tfjs-node": "../tfjs/tfjs-node",
-    "@vladmandic/pilogger": "^0.2.2",
+    "@tensorflow/tfjs-node": "^3.2.0",
+    "@vladmandic/pilogger": "^0.2.14",
     "canvas": "^2.6.1"
   },
   "devDependencies": {
-    "eslint": "^7.10.0",
-    "eslint-config-airbnb-base": "^14.2.0",
+    "eslint": "^7.21.0",
+    "eslint-config-airbnb-base": "^14.2.1",
     "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-node": "^11.1.0"
   }
