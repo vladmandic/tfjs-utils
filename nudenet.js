@@ -196,9 +196,9 @@ async function processSavedModel(modelPath, inImage, outImage) {
   }
   const t1 = process.hrtime.bigint();
   // parse outputs
-  const res = resT ? await processPrediction(resT, imageT, models[modelPath]) : [];
+  const res = resT ? await processPrediction(resT, imageT) : [];
   // free up memory
-  imageT.dispose();
+  tf.dispose(imageT);
   for (const tensorT of resT) tensorT.dispose();
   // save processed image and return result
   await saveProcessedImage(inImage, outImage, res);
@@ -229,7 +229,7 @@ async function processGraphModel(modelPath, inImage, outImage) {
     log.error('Error executing graph model:', modelPath, err.message);
   }
   // parse outputs
-  const res = resT ? await processPrediction(resT, imageT, models[modelPath]) : [];
+  const res = resT ? await processPrediction(resT, imageT) : [];
   // free up memory
   imageT.dispose();
   for (const tensorT of resT) tensorT.dispose();
