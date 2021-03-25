@@ -2,3 +2,4 @@ node_modules
 inputs/**
 outputs/**
 models/**
+pnpm-lock.yaml
