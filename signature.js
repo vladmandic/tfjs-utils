@@ -1,4 +1,9 @@
-#!/usr/bin/env -S node --no-deprecation --trace-warnings
+/**
+ * Analyze SavedModel or GraphModel input/output tensors
+ * Based on either model signature or model executor
+ *
+ * @param modelPath: string
+ */
 
 const fs = require('fs');
 const path = require('path');

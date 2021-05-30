@@ -1,8 +1,8 @@
 {
-  "name": "detector",
+  "name": "tfjs-utils",
   "version": "0.0.1",
-  "description": "",
-  "main": "detector.js",
+  "description": "Collection of generic JS utils when working with TF models",
+  "main": "signature.js",
   "engines": {
     "node": ">=14.0.0"
   },

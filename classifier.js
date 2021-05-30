@@ -1,23 +1,37 @@
+/**
+ * General TFJS image classifier for NodeJS
+ * @param modelPath: string
+ * @param imagePath: string
+ *
+ * Where model can be any TF model in SavedModel or GraphModel format
+ * which outputs single output tensor with scores
+ *
+ * Classes are loaded and parsed from optional `classes.json` if found in modelPath
+ */
+
 const fs = require('fs');
 const path = require('path');
 const log = require('@vladmandic/pilogger');
 const tf = require('@tensorflow/tfjs-node');
 
-// app options
-let inputSize = 224;
-const divFactor = 1.0;
-const minScore = 0.1;
+// model options
+const options = {
+  inputSize: 224, // optional input size, only used if input shape cannot be determined from the model itself
+  normFactor: 1.0, // used to normalize input, e.g. set to 255 if model expects input in range of 0..1
+  minScore: 0.1, // filter scores below threshold
+  maxResults: 5, // maximum results returned by classifer
+};
 
 function getTensorFromImage(image, dtype) {
   if (!fs.existsSync(image)) {
     log.error('Not found:', image);
-    return tf.zeros(inputSize[0]);
+    return tf.zeros(options.inputSize[0]);
   }
   // load & decode jpeg
   const data = fs.readFileSync(image);
   const bufferT = tf.node.decodeImage(data);
   // resize
-  const resizeT = tf.image.resizeBilinear(bufferT, [inputSize, inputSize]);
+  const resizeT = tf.image.resizeBilinear(bufferT, [options.inputSize, options.inputSize]);
   tf.dispose(bufferT);
   // add dimension as detection requires 4d tensor
   const expandT = tf.expandDims(resizeT, 0);
@@ -26,7 +40,7 @@ function getTensorFromImage(image, dtype) {
   let imageT;
   if ((dtype === 'float16') || (dtype === 'float32') || (dtype === 'DT_FLOAT')) {
     const casted = tf.cast(expandT, 'float32');
-    imageT = tf.mul(casted, [1.0 / divFactor]);
+    imageT = tf.mul(casted, [1.0 / options.normFactor]);
     tf.dispose(casted);
   } else {
     imageT = tf.clone(expandT);
@@ -49,9 +63,9 @@ async function loadSavedModel(modelPath) {
   try {
     // @ts-ignore
     const size = Object.values(def.signatureDefs[signature].inputs)[0]['shape'][1].array[0];
-    if (size && size > 0) inputSize = size;
+    if (size && size > 0) options.inputSize = size;
   } catch { /**/ }
-  log.data('Image size:', inputSize);
+  log.data('Image size:', options.inputSize);
   // load model
   try {
     model = await tf.node.loadSavedModel(modelPath, tags, signature);
@@ -77,12 +91,12 @@ async function loadGraphModel(modelPath) {
   try {
     // @ts-ignore
     const size = Object.values(model.modelSignature['inputs'])[0].tensorShape.dim[1].size;
-    if (size && size > 0) inputSize = size;
+    if (size && size > 0) options.inputSize = size;
     const dtype = Object.values(model.modelSignature['inputs'])[0].dtype;
     // @ts-ignore
     model.dtype = dtype || 'float32';
   } catch { /**/ }
-  log.data('Image size:', inputSize);
+  log.data('Image size:', options.inputSize);
   return model;
 }
 
@@ -116,8 +130,9 @@ async function classify(modelPath, image) {
     const scores = [];
     res.forEach((a, i) => scores.push({ index: i + 1, score: a }));
     scores.sort((a, b) => b.score - a.score);
-    const top = scores.filter((a) => a.score > minScore).slice(0, 5);
-    const classes = JSON.parse(fs.readFileSync(path.join(modelPath, 'classes.json')).toString());
+    const top = scores.filter((a) => a.score > options.minScore).slice(0, options.maxResults);
+    const classesData = fs.existsSync(path.join(modelPath, 'classes.json')) ? fs.readFileSync(path.join(modelPath, 'classes.json')).toString() : '[]';
+    const classes = JSON.parse(classesData);
     for (const score of top) log.data(`Score: ${Math.trunc(100 * score.score)}% ID: ${classes[score.index].id} Class: ${classes[score.index].displayName}`);
   } else log.data('Result empty');
   imageT?.dispose();
@@ -135,7 +150,7 @@ async function main() {
   log.info('TensorFlow/JS Flags', tf.env().getFlags());
   log.state('Params:', process.argv);
   if (process.argv.length !== 4) {
-    log.error('Required params: <modelPath> <image>');
+    log.error('Required params: <modelPath> <imagePath>');
     process.exit(1);
   }
   const modelPath = fs.existsSync(process.argv[2]) && fs.statSync(process.argv[2]).isDirectory() ? process.argv[2] : null;
@@ -145,7 +160,7 @@ async function main() {
   }
   const image = fs.existsSync(process.argv[3]) && fs.statSync(process.argv[3]).isFile() ? process.argv[3] : null;
   if (!image) {
-    log.error('<image> is not a valid file');
+    log.error('<imagePath> is not a valid file');
     process.exit(1);
   }
   await classify(modelPath, image);

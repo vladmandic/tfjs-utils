@@ -1,5 +1,12 @@
+/**
+ * General TFJS object detector for NodeJS
+ * @param modelPath: string
+ * @param imagePath: string
+ */
+
 const fs = require('fs');
 const path = require('path');
+// @ts-ignore
 const log = require('@vladmandic/pilogger');
 const tf = require('@tensorflow/tfjs-node');
 const canvas = require('canvas');
@@ -18,8 +25,8 @@ const minScore = 0.35;
 const maxResults = 50;
 const iouThreshold = 0.1;
 
-const coco = JSON.parse(fs.readFileSync('./coco.json').toString());
-const openimages = JSON.parse(fs.readFileSync('./openimages.json').toString());
+const coco = JSON.parse(fs.readFileSync('./classes/coco.json').toString());
+const openimages = JSON.parse(fs.readFileSync('./classes/openimages.json').toString());
 const models = [];
 let performances = {};
 
@@ -74,7 +81,9 @@ function getTensorFromImage(image, dtype) {
     imageT = tf.clone(expanded);
   }
   // return image tensor
+  // @ts-ignore
   imageT.file = image;
+  // @ts-ignore
   if (debug) log.info('Image:', imageT.file, bufferT.size, 'bytes with shape:', imageT.shape, 'dtype:', dtype);
   tf.dispose(expanded);
   tf.dispose(bufferT);
@@ -295,12 +304,12 @@ async function testAll({ graph = true, saved = true, single = false }) {
 }
 
 // eslint-disable-next-line no-unused-vars
-async function testSingle() {
+async function testSingle(modelPath, imagePath) {
   performances = {};
 
   // await processSavedModel('inputs/bikes.jpg', 'models/saved/faster-rcnn-inception-resnet-v2-atrous-v4-oi');
   // await processGraphModel('inputs/bikes.jpg', 'models/graph/openimages-faster-rcnn-inception-resnet-v2-atrous-v4');
-  await processGraphModel('inputs/people.jpg', 'models/saved/faceboxes/graph-f16');
+  await processGraphModel(imagePath, modelPath);
 
   for (const [model, data] of Object.entries(performances)) log.info(model, data);
   for (const model in models) tf.dispose(model);
@@ -318,7 +327,22 @@ async function main() {
   log.info('TensorFlow/JS Flags', tf.env().getFlags());
 
   // await testAll({ graph: false, saved: true, single: true });
-  await testSingle();
+
+  const modelPath = fs.existsSync(process.argv[2]) && fs.statSync(process.argv[2]).isDirectory() ? process.argv[2] : null;
+  if (!modelPath) {
+    log.error('<modelPath> is not a valid directory');
+    process.exit(1);
+  }
+  const imagePath = process.argv[3];
+  if (!fs.existsSync(imagePath)) {
+    log.error('<imagePath> is not a valid file or directory');
+    process.exit(1);
+  }
+  if (fs.statSync(imagePath).isFile()) {
+    await testSingle(modelPath, imagePath);
+  } else if (fs.statSync(imagePath).isDirectory()) {
+    // testAll is currently hard-coded, change it as needed
+  }
 }
 
 main();
