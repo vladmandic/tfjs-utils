@@ -52,6 +52,14 @@ async function analyzeGraph(modelPath) {
     log.warn('model outputs: cannot determine');
   }
 
+  const ops = {};
+  // @ts-ignore
+  for (const op of Object.values(model.executor.graph.nodes)) {
+    if (!ops[op.category]) ops[op.category] = [];
+    if (!ops[op.category].includes(op.op)) ops[op.category].push(op.op);
+  }
+  log.data('ops used by model:', ops);
+
   log.data('inputs:', inputs);
   log.data('outputs:', outputs);
 }
