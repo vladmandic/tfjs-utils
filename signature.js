@@ -16,7 +16,7 @@ async function analyzeGraph(modelPath) {
   log.info('size:', tf.engine().memory());
 
   const inputs = [];
-  if (model.modelSignature['inputs']) {
+  if (model.modelSignature && model.modelSignature['inputs']) {
     log.info('model inputs based on signature');
     for (const [key, val] of Object.entries(model.modelSignature['inputs'])) {
       const shape = val.tensorShape.dim.map((a) => parseInt(a.size));
@@ -35,7 +35,7 @@ async function analyzeGraph(modelPath) {
 
   const outputs = [];
   let i = 0;
-  if (Object.values(model.modelSignature['outputs'])[0].dtype) {
+  if (model.modelSignature && model.modelSignature['outputs'] && Object.values(model.modelSignature['outputs'])[0].dtype) {
     log.info('model outputs based on signature');
     for (const [key, val] of Object.entries(model.modelSignature['outputs'])) {
       const shape = val.tensorShape?.dim.map((a) => parseInt(a.size));
