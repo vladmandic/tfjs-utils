@@ -14,6 +14,10 @@ collection of generic js utils when working with tf models
 
 - `/tfjs`: custom built tfjs esm modules
 
+## helpers
+
+- `/server/serve.js` lightweight http/https server with built-in watcher and built toolchain
+
 ## classes
 
 `/classes/*.json`:  
