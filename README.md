@@ -1,15 +1,20 @@
-# TFJS Utils
+# tfjs utils
 
-Collection of generic JS utils when working with TF models
+collection of generic js utils when working with tf models
 
-## Tools
+## tools
 
 - `signature.js`: analyze saved model or graph model input/output tensors based on either model signature or model executor
 - `classifier.js`: generic tf image classifier
 - `detector.js`: generic tf object detector
 - `freeze.py`: convert tf frozen model to saved model
+- `kernels.js`: generate html table of supported tfjs kernels per backend
 
-## Classes
+## assets
+
+- `/tfjs`: custom built tfjs esm modules
+
+## classes
 
 `/classes/*.json`:  
 contains class label definitions for different datasets in JSON format:

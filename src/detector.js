@@ -39,7 +39,7 @@ function perf(model, time) {
   performances[model].max = performances[model].max > t ? performances[model].max : t;
 }
 
-function rect({ drawCanvas = null, x = 0, y = 0, width = 0, height = 0, radius = 8, lineWidth = 2, color = 'white', title = null, font = 'small-caps 28px "Segoe UI"' }) {
+function rect({ drawCanvas, x = 0, y = 0, width = 0, height = 0, radius = 8, lineWidth = 2, color = 'white', title = '', font = 'small-caps 28px "Segoe UI"' }) {
   const ctx = drawCanvas.getContext('2d');
   ctx.lineWidth = lineWidth;
   ctx.beginPath();
@@ -58,7 +58,7 @@ function rect({ drawCanvas = null, x = 0, y = 0, width = 0, height = 0, radius =
   ctx.lineWidth = 2;
   ctx.fillStyle = color;
   ctx.font = font;
-  if (title) ctx.fillText(title, x + 4, y + 24);
+  if (title && title !== '') ctx.fillText(title, x + 4, y + 24);
 }
 
 function getTensorFromImage(image, dtype) {
