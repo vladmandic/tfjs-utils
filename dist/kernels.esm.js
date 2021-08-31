@@ -40,9 +40,9 @@ var __toModule = (module) => {
 var require_long = __commonJS({
   "node_modules/.pnpm/long@4.0.0/node_modules/long/src/long.js"(exports, module) {
     module.exports = Long2;
-    var wasm2 = null;
+    var wasm = null;
     try {
-      wasm2 = new WebAssembly.Instance(new WebAssembly.Module(new Uint8Array([
+      wasm = new WebAssembly.Instance(new WebAssembly.Module(new Uint8Array([
         0,
         97,
         115,
@@ -622,9 +622,9 @@ var require_long = __commonJS({
         return ZERO;
       if (!isLong(multiplier))
         multiplier = fromValue(multiplier);
-      if (wasm2) {
-        var low = wasm2.mul(this.low, this.high, multiplier.low, multiplier.high);
-        return fromBits(low, wasm2.get_high(), this.unsigned);
+      if (wasm) {
+        var low = wasm.mul(this.low, this.high, multiplier.low, multiplier.high);
+        return fromBits(low, wasm.get_high(), this.unsigned);
       }
       if (multiplier.isZero())
         return ZERO;
@@ -678,12 +678,12 @@ var require_long = __commonJS({
         divisor = fromValue(divisor);
       if (divisor.isZero())
         throw Error("division by zero");
-      if (wasm2) {
+      if (wasm) {
         if (!this.unsigned && this.high === -2147483648 && divisor.low === -1 && divisor.high === -1) {
           return this;
         }
-        var low = (this.unsigned ? wasm2.div_u : wasm2.div_s)(this.low, this.high, divisor.low, divisor.high);
-        return fromBits(low, wasm2.get_high(), this.unsigned);
+        var low = (this.unsigned ? wasm.div_u : wasm.div_s)(this.low, this.high, divisor.low, divisor.high);
+        return fromBits(low, wasm.get_high(), this.unsigned);
       }
       if (this.isZero())
         return this.unsigned ? UZERO : ZERO;
@@ -743,9 +743,9 @@ var require_long = __commonJS({
     LongPrototype.modulo = function modulo(divisor) {
       if (!isLong(divisor))
         divisor = fromValue(divisor);
-      if (wasm2) {
-        var low = (this.unsigned ? wasm2.rem_u : wasm2.rem_s)(this.low, this.high, divisor.low, divisor.high);
-        return fromBits(low, wasm2.get_high(), this.unsigned);
+      if (wasm) {
+        var low = (this.unsigned ? wasm.rem_u : wasm.rem_s)(this.low, this.high, divisor.low, divisor.high);
+        return fromBits(low, wasm.get_high(), this.unsigned);
       }
       return this.sub(this.div(divisor).mul(divisor));
     };
@@ -35565,7 +35565,7 @@ ENV3.registerFlag("TOPK_K_CPU_HANDOFF_THRESHOLD", () => 128);
 
 // node_modules/.pnpm/@tensorflow+tfjs-backend-webgl@3.9.0_@tensorflow+tfjs-core@3.9.0/node_modules/@tensorflow/tfjs-backend-webgl/dist/glsl_version.js
 function getGlslDifferences() {
-  let version10;
+  let version9;
   let attribute;
   let varyingVs;
   let varyingFs;
@@ -35576,7 +35576,7 @@ function getGlslDifferences() {
   let defineSpecialInf;
   let defineRound;
   if (env().getNumber("WEBGL_VERSION") === 2) {
-    version10 = "#version 300 es";
+    version9 = "#version 300 es";
     attribute = "in";
     varyingVs = "out";
     varyingFs = "in";
@@ -35607,7 +35607,7 @@ function getGlslDifferences() {
       }
     `;
   } else {
-    version10 = "";
+    version9 = "";
     attribute = "attribute";
     varyingVs = "varying";
     varyingFs = "varying";
@@ -35644,7 +35644,7 @@ function getGlslDifferences() {
     `;
   }
   return {
-    version: version10,
+    version: version9,
     attribute,
     varyingVs,
     varyingFs,
@@ -52042,9 +52042,9 @@ var wasmWorkerContents = 'var Module={};function threadPrintErr(){var text=Array
 // node_modules/.pnpm/@tensorflow+tfjs-backend-wasm@3.9.0_@tensorflow+tfjs-core@3.9.0/node_modules/@tensorflow/tfjs-backend-wasm/dist/backend_wasm.js
 var import_tfjs_backend_wasm = __toModule(require_tfjs_backend_wasm());
 var BackendWasm = class extends KernelBackend {
-  constructor(wasm2) {
+  constructor(wasm) {
     super();
-    this.wasm = wasm2;
+    this.wasm = wasm;
     this.dataIdNextNumber = 1;
     this.wasm.tfjs.init();
     this.dataIdMap = new DataStorage(this, engine());
@@ -52226,14 +52226,14 @@ async function init() {
       const rejectMsg = "Make sure the server can serve the `.wasm` file relative to the bundled js file. For more details see https://github.com/tensorflow/tfjs/blob/master/tfjs-backend-wasm/README.md#using-bundlers";
       reject({ message: rejectMsg });
     };
-    let wasm2;
+    let wasm;
     if (threadsSupported && simdSupported && wasmPath == null) {
       factoryConfig.mainScriptUrlOrBlob = new Blob([`var WasmBackendModuleThreadedSimd = ` + import_tfjs_backend_wasm_threaded_simd.default.toString()], { type: "text/javascript" });
-      wasm2 = (0, import_tfjs_backend_wasm_threaded_simd.default)(factoryConfig);
+      wasm = (0, import_tfjs_backend_wasm_threaded_simd.default)(factoryConfig);
     } else {
-      wasm2 = (0, import_tfjs_backend_wasm.default)(factoryConfig);
+      wasm = (0, import_tfjs_backend_wasm.default)(factoryConfig);
     }
-    wasm2.then((module) => {
+    wasm.then((module) => {
       initialized = true;
       initAborted = false;
       const voidReturnType = null;
@@ -52269,21 +52269,14 @@ var wasmFileMap = {};
 var initAborted = false;
 var customFetch = false;
 
-// node_modules/.pnpm/@tensorflow+tfjs-backend-wasm@3.9.0_@tensorflow+tfjs-core@3.9.0/node_modules/@tensorflow/tfjs-backend-wasm/dist/version.js
-var version9 = "3.9.0";
-
 // node_modules/.pnpm/@tensorflow+tfjs-backend-wasm@3.9.0_@tensorflow+tfjs-core@3.9.0/node_modules/@tensorflow/tfjs-backend-wasm/dist/base.js
 var WASM_PRIORITY = 2;
 registerBackend("wasm", async () => {
-  const { wasm: wasm2 } = await init();
-  return new BackendWasm(wasm2);
+  const { wasm } = await init();
+  return new BackendWasm(wasm);
 }, WASM_PRIORITY);
 
 // tfjs/tf-backend-webgpu.fesm.js
-var tf_backend_webgpu_fesm_exports = {};
-__export(tf_backend_webgpu_fesm_exports, {
-  webgpu: () => webgpu
-});
 var ENV5 = env();
 ENV5.registerFlag("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", () => 15);
 ENV5.registerFlag("WEBGPU_CPU_FORWARD", () => true);
@@ -53575,18 +53568,6 @@ function isWebGPUSupported() {
   }
   return true;
 }
-var webgpu_util = /* @__PURE__ */ Object.freeze({
-  __proto__: null,
-  tilesFitEvenlyIntoShape,
-  computeDispatch,
-  computeWorkGroupSizeForConv2d,
-  computeWorkGroupSizeForMatMul,
-  computeWorkPerThreadForConv2d,
-  flatDispatchLayout,
-  GPUBytesPerElement,
-  ArrayBufferToTypedArray,
-  isWebGPUSupported
-});
 function getGlslDifferences2() {
   const defineSpecialNaN = `
       bool isnan_custom(float val) {
@@ -63600,11 +63581,6 @@ var WebGPUBackend = class extends KernelBackend {
   }
 };
 WebGPUBackend.nextDataId = 0;
-var webgpu = /* @__PURE__ */ Object.freeze({
-  __proto__: null,
-  webgpu_util,
-  WebGPUBackend
-});
 if (device_util_exports.isBrowser() && isWebGPUSupported()) {
   registerBackend("webgpu", async () => {
     env().set("CHECK_COMPUTATION_FOR_ERRORS", false);
@@ -63649,12 +63625,15 @@ async function log9(...msg) {
 function enumerateKernels(backends) {
   const kernels = {};
   for (const backend2 of backends) {
-    const kernelList = getKernelsForBackend(backend2);
+    let kernelCount = 0;
+    const kernelList = getKernelsForBackend(backend2.toLowerCase());
     for (const kernel of kernelList) {
       if (!kernels[kernel.kernelName])
         kernels[kernel.kernelName] = {};
       kernels[kernel.kernelName][kernel.backendName] = true;
+      kernelCount++;
     }
+    log9(`kernels found for ${backend2}:`, kernelCount);
   }
   return kernels;
 }
@@ -63664,7 +63643,7 @@ function generateKernelsHMTL(backends, kernels) {
   let html = `
     <!-- <caption>List of TF Kernels implemented for each Backend</caption> -->
     <colgroup>
-      <col style="background-color: #3f3f3f">
+      <col style="background-color: #3f3f3f; width: 16rem">
       <col span="${backends.length}" style="background-color: #1f1f1f; width: 4rem">
     </colgroup>
     <thead>
@@ -63676,7 +63655,7 @@ function generateKernelsHMTL(backends, kernels) {
     <tbody style="font-size: 0.8rem">
   `;
   for (const kernel of Object.keys(kernels)) {
-    const implemented = backends.map((backend2) => `<td style="text-align: center; background-color: ${kernels[kernel][backend2] ? "darkslategrey" : "maroon"}">${kernels[kernel][backend2] ? "&#10004" : "-"}</td>`).join("");
+    const implemented = backends.map((backend2) => `<td style="text-align: center; background-color: ${kernels[kernel][backend2.toLowerCase()] ? "darkslategrey" : "maroon"}">${kernels[kernel][backend2.toLowerCase()] ? "&#10004" : "-"}</td>`).join("");
     html += `
         <tr>
           <td style="padding-left: 0.5rem">${kernel}</td>
@@ -63691,11 +63670,11 @@ function generateKernelsHMTL(backends, kernels) {
 }
 async function main() {
   log9("list of tensorflow/js kernels implemented for each backend");
-  log9(`tfjs: ${version8.tfjs} webgl: ${version8["tfjs-backend-webgl"]} wasm: ${version9} webgpu: custom`);
-  console.log(tf_backend_webgpu_fesm_exports);
-  const backends = ["cpu", "wasm", "webgl", "webgpu"];
+  log9("tfjs version:", version8.tfjs);
+  const backends = ["CPU", "WASM", "WebGL", "WebGPU"];
+  log9("analyzing backends:", backends);
   const kernels = enumerateKernels(backends);
-  log9("kernels:", Object.keys(kernels).length);
+  log9("total kernels found:", Object.keys(kernels).length);
   console.log(kernels);
   const table = generateKernelsHMTL(backends, kernels);
   document.body.appendChild(table);

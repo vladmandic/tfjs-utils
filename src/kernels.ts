@@ -1,8 +1,8 @@
 import * as tf from '@tensorflow/tfjs';
 // import '@tensorflow/tfjs-backend-webgl'; included in tfjs
-import * as wasm from '@tensorflow/tfjs-backend-wasm';
+import '@tensorflow/tfjs-backend-wasm';
 // import '@tensorflow/tfjs-backend-webgpu'; // old package
-import * as webgpu from '../tfjs/tf-backend-webgpu.fesm.js'; // custom built
+import '../tfjs/tf-backend-webgpu.fesm.js'; // custom built
 
 export async function log(...msg) {
   const str = () => { // helper function: translates json to human readable string
@@ -22,14 +22,17 @@ export async function log(...msg) {
   if (div) div.innerHTML += ts + '&nbsp &nbsp' + str() + '<br>';
 }
 
-function enumerateKernels(backends) {
+function enumerateKernels(backends: Array<string>) {
   const kernels = {};
   for (const backend of backends) {
-    const kernelList = tf.getKernelsForBackend(backend);
+    let kernelCount = 0;
+    const kernelList = tf.getKernelsForBackend(backend.toLowerCase());
     for (const kernel of kernelList) {
       if (!kernels[kernel.kernelName]) kernels[kernel.kernelName] = {};
       kernels[kernel.kernelName][kernel.backendName] = true;
+      kernelCount++;
     }
+    log(`kernels found for ${backend}:`, kernelCount);
   }
   return kernels;
 }
@@ -40,7 +43,7 @@ function generateKernelsHMTL(backends, kernels) {
   let html = `
     <!-- <caption>List of TF Kernels implemented for each Backend</caption> -->
     <colgroup>
-      <col style="background-color: #3f3f3f">
+      <col style="background-color: #3f3f3f; width: 16rem">
       <col span="${backends.length}" style="background-color: #1f1f1f; width: 4rem">
     </colgroup>
     <thead>
@@ -52,7 +55,7 @@ function generateKernelsHMTL(backends, kernels) {
     <tbody style="font-size: 0.8rem">
   `;
   for (const kernel of Object.keys(kernels)) {
-    const implemented = backends.map((backend) => `<td style="text-align: center; background-color: ${kernels[kernel][backend] ? "darkslategrey" : "maroon"}">${kernels[kernel][backend] ? '&#10004' : '-'}</td>`).join('');
+    const implemented = backends.map((backend) => `<td style="text-align: center; background-color: ${kernels[kernel][backend.toLowerCase()] ? "darkslategrey" : "maroon"}">${kernels[kernel][backend.toLowerCase()] ? '&#10004' : '-'}</td>`).join('');
     html += `
         <tr>
           <td style="padding-left: 0.5rem">${kernel}</td>
@@ -68,11 +71,11 @@ function generateKernelsHMTL(backends, kernels) {
 
 async function main() {
   log('list of tensorflow/js kernels implemented for each backend')
-  log(`tfjs: ${tf.version.tfjs} webgl: ${tf.version['tfjs-backend-webgl']} wasm: ${wasm.version_wasm} webgpu: custom`);
-  console.log(webgpu);
-  const backends = ['cpu', 'wasm', 'webgl', 'webgpu'];
+  log('tfjs version:', tf.version.tfjs);
+  const backends = ['CPU', 'WASM', 'WebGL', 'WebGPU'];
+  log('analyzing backends:', backends);
   const kernels = enumerateKernels(backends);
-  log('kernels:', Object.keys(kernels).length);
+  log('total kernels found:', Object.keys(kernels).length);
   console.log(kernels);
   const table = generateKernelsHMTL(backends, kernels);
   document.body.appendChild(table);
