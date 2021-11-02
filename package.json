@@ -7,18 +7,15 @@
     "node": ">=14.0.0"
   },
   "scripts": {
-    "start": "node --trace-warnings --trace-uncaught --unhandled-rejections=warn --stack-trace-limit=50 --no-deprecation ./detector.js"
+    "start": "node --trace-warnings --trace-uncaught --unhandled-rejections=warn --stack-trace-limit=50 --no-deprecation ./detector.js",
+    "kernels": "esbuild --bundle --format=esm --minify --platform=browser --target=esnext --outfile=dist/kernels.esm.js src/kernels.ts"
   },
   "author": "Vladimir Mandic <mandic00@live.com>",
   "license": "MIT",
   "dependencies": {
-    "@tensorflow/tfjs": "^3.11.0",
-    "@tensorflow/tfjs-backend-wasm": "^3.11.0",
-    "@tensorflow/tfjs-backend-webgl": "^3.11.0",
-    "@tensorflow/tfjs-backend-webgpu": "^0.0.1-alpha.8",
-    "@tensorflow/tfjs-core": "^3.11.0",
     "@tensorflow/tfjs-node": "^3.11.0",
     "@vladmandic/pilogger": "^0.3.5",
+    "@vladmandic/tfjs": "github:vladmandic/tfjs",
     "canvas": "^2.8.0",
     "rimraf": "^3.0.2"
   },
