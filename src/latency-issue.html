@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+		<meta charset="utf-8">
+		<title>tfjs latency issue test</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	</head>
+	<body style="margin: 10px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: black; color: white;">
+    <div id="log"></div>
+    <script type="module">
+      import * as tf from 'https://vladmandic.github.io/tfjs/dist/tfjs.min.esm.js'; // this is vanilla tfjs esm my nightly build from master and includes all backends
+
+      const log = (...msg) => document.getElementById('log').innerText += msg + '\n';
+      const numIterations = 50;
+
+      async function testBackend(backend) {
+        tf.setBackend(backend);
+        await tf.ready();
+        const t0 = performance.now();
+        for (let i = 0; i < numIterations; i++) {
+          const rgba = tf.zeros([2048, 2048, 4], 'int32'); // simulate large rgba image
+          const rgb = tf.slice3d(rgba, [0, 0, 0], [-1, -1, 3]); // strip alpha channel
+          const tensor = tf.expandDims(rgb, 0); // create standard image tensor [1, height, width, 3]
+          tf.dispose([rgba, rgb, tensor]); // just dispose everything
+        }
+        const t1 = performance.now();
+        const totalTime = Math.round(t1 - t0);
+        const avgTime = Math.round(totalTime / numIterations);
+        log(`backend: ${tf.getBackend()} | total time: ${totalTime} ms | average time: ${avgTime} ms `);
+      }
+
+      async function main() {
+        log(`user agent: ${navigator.userAgent}`);
+        log(`tf version: ${tf.version.tfjs}`);
+        await testBackend('webgl');
+        await testBackend('webgpu');
+      }
+
+      window.onload = main;
+    </script>
+  </body>
+</html>

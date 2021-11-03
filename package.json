@@ -14,6 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "@tensorflow/tfjs-node": "^3.11.0",
+    "@vladmandic/build": "^0.6.3",
     "@vladmandic/pilogger": "^0.3.5",
     "@vladmandic/tfjs": "github:vladmandic/tfjs",
     "canvas": "^2.8.0",
