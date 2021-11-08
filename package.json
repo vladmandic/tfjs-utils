@@ -1,6 +1,6 @@
 {
   "name": "tfjs-utils",
-  "version": "0.0.1",
+  "version": "0.9.0",
   "description": "Collection of generic JS utils when working with TF models",
   "main": "signature.js",
   "engines": {
@@ -23,7 +23,7 @@
   "devDependencies": {
     "chokidar": "^3.5.2",
     "esbuild": "^0.13.12",
-    "eslint": "^8.1.0",
+    "eslint": "^8.2.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-plugin-import": "^2.25.2",
     "eslint-plugin-node": "^11.1.0"
