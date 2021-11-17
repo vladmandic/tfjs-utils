@@ -8,7 +8,7 @@
 	<body style="margin: 10px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: black; color: white;">
     <div id="log"></div>
     <script type="module">
-      import * as tf from 'https://vladmandic.github.io/tfjs/dist/tfjs.min.esm.js'; // this is vanilla tfjs esm my nightly build from master and includes all backends
+      import * as tf from 'https://vladmandic.github.io/tfjs/dist/tfjs.esm.js'; // this is vanilla tfjs esm my nightly build from master and includes all backends
 
       const log = (...msg) => document.getElementById('log').innerText += msg + '\n';
       const numIterations = 50;
@@ -32,6 +32,8 @@
       async function main() {
         log(`user agent: ${navigator.userAgent}`);
         log(`tf version: ${tf.version.tfjs}`);
+        tf.setWasmPaths('https://vladmandic.github.io/tfjs/dist/');
+        await testBackend('wasm');
         await testBackend('webgl');
         await testBackend('webgpu');
       }
