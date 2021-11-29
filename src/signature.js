@@ -124,6 +124,10 @@ async function analyzeSaved(modelPath) {
   const sign = Object.values(meta[0].signatureDefs)[0];
   log.data('tags:', meta[0].tags);
   log.data('signature:', Object.keys(meta[0].signatureDefs));
+  if (!sign) {
+    log.error('model is missing signature');
+    return;
+  }
   const inputs = Object.values(sign.inputs)[0];
   // @ts-ignore
   const inputShape = inputs.shape?.map((a) => a.array[0]);
