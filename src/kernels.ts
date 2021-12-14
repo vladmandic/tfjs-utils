@@ -26,6 +26,7 @@ function enumerateKernels(backends: Array<string>) {
   const kernels = {};
   for (const backend of backends) {
     let kernelCount = 0;
+    // @ts-ignore
     const kernelList = tf.getKernelsForBackend(backend.toLowerCase());
     for (const kernel of kernelList) {
       if (!kernels[kernel.kernelName]) kernels[kernel.kernelName] = {};
