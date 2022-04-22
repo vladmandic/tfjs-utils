@@ -13,19 +13,19 @@
   "author": "Vladimir Mandic <mandic00@live.com>",
   "license": "MIT",
   "dependencies": {
-    "@tensorflow/tfjs-node": "^3.12.0",
-    "@vladmandic/build": "^0.6.6",
-    "@vladmandic/pilogger": "^0.3.5",
+    "@tensorflow/tfjs-node": "^3.16.0",
+    "@vladmandic/build": "^0.7.3",
+    "@vladmandic/pilogger": "^0.4.4",
     "@vladmandic/tfjs": "github:vladmandic/tfjs",
-    "canvas": "^2.8.0",
+    "canvas": "^2.9.1",
     "rimraf": "^3.0.2"
   },
   "devDependencies": {
-    "chokidar": "^3.5.2",
-    "esbuild": "^0.14.3",
-    "eslint": "^8.4.1",
+    "chokidar": "^3.5.3",
+    "esbuild": "^0.14.38",
+    "eslint": "^8.13.0",
     "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-plugin-import": "^2.25.3",
+    "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-node": "^11.1.0"
   }
 }

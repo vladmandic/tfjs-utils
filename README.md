@@ -10,13 +10,12 @@ collection of generic js utils when working with tf models
 - `freeze.py`: convert tf frozen model to saved model
 - `kernels.js`: generate html table of supported tfjs kernels per backend
 
-## assets
+## other
 
-- `/tfjs`: custom built tfjs esm modules
-
-## helpers
-
-- `/server/serve.js` lightweight http/https server with built-in watcher and built toolchain
+- `tfjs`: custom built tfjs esm modules  
+  moved to `vladmandic/tfjs`
+- `/server/serve.js` lightweight http/https server with built-in watcher and built toolchain  
+  integrated into `vladmandic/build`
 
 ## classes
 

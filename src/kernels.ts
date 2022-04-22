@@ -1,8 +1,5 @@
-import * as tf from '@vladmandic/tfjs';
-// import '@tensorflow/tfjs-backend-webgl'; included in tfjs
-// import '@tensorflow/tfjs-backend-wasm';
-// import '@tensorflow/tfjs-backend-webgpu'; // old package
-// import '../tfjs/tf-backend-webgpu.fesm.js'; // custom built
+import * as tf from '@vladmandic/tfjs'; // using custom tfjs build
+// or import original @tensorflow/tfjs plus required backends
 
 export async function log(...msg) {
   const str = () => { // helper function: translates json to human readable string

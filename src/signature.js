@@ -10,6 +10,8 @@ const path = require('path');
 const log = require('@vladmandic/pilogger');
 const tf = require('@tensorflow/tfjs-node');
 
+const excludedKernelOps = ['Placeholder'];
+
 async function analyzeGraph(modelPath) {
   log.info('graph model:', path.resolve(modelPath));
   const stat = fs.statSync(modelPath);
@@ -71,6 +73,7 @@ async function analyzeGraph(modelPath) {
     const ops = {};
     // @ts-ignore
     for (const op of Object.values(model.executor.graph.nodes)) {
+      if (excludedKernelOps.includes(op.op)) continue;
       if (!ops[op.category]) ops[op.category] = [];
       if (!ops[op.category].includes(op.op)) ops[op.category].push(op.op);
     }
@@ -121,11 +124,11 @@ async function analyzeGraph(modelPath) {
 async function analyzeSaved(modelPath) {
   const meta = await tf.node.getMetaGraphsFromSavedModel(modelPath);
   log.info('saved model:', path.resolve(modelPath));
-  const sign = Object.values(meta[0].signatureDefs)[0];
   log.data('tags:', meta[0].tags);
   log.data('signature:', Object.keys(meta[0].signatureDefs));
+  const sign = Object.values(meta[0].signatureDefs)[0];
   if (!sign) {
-    log.error('model is missing signature');
+    log.error('model is missing full signature');
     return;
   }
   const inputs = Object.values(sign.inputs)[0];
@@ -147,10 +150,10 @@ async function main() {
   const param = process.argv[2];
   if (process.argv.length !== 3) {
     log.error('path required');
-    process.exit(0);
+    process.exit(1);
   } else if (!fs.existsSync(param)) {
     log.error(`path does not exist: ${param}`);
-    process.exit(0);
+    process.exit(1);
   }
   const stat = fs.statSync(param);
   if (stat.isFile()) {
