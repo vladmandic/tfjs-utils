@@ -114,11 +114,85 @@ async function analyzeGraph(modelPath) {
     };
   }
 
-  for (const input of await analyzeInputs()) log.blank('', input);
-  for (const output of await analyzeOutputs()) log.blank('', output);
+  async function analyzeTopology() {
+    const nodes = model.artifacts?.modelTopology?.node;
+    if (!nodes) return undefined;
+
+    /*
+    let executionOps = 0;
+    const maxDepth = 100;
+    const maxChildren = 1;
+    const walkExecutor = (node) => {
+      if (typeof walkExecutor.depth === 'undefined') walkExecutor.depth = 0;
+      else walkExecutor.depth++;
+      executionOps += 1;
+      if (node && node.children && Array.isArray(node.children)) {
+        if (walkExecutor.depth < maxDepth) {
+          for (let i = 0; (i < node.children.length) && (i < maxChildren); i++) walkExecutor(node.children[i]);
+        }
+      }
+      walkExecutor.depth--;
+    };
+    walkExecutor(model.executor.graph.placeholders[0]);
+    */
+
+    return {
+      nodes: nodes.length,
+      // executionOps,
+    };
+  }
+
+  async function analyzeExecution(input) {
+    if (input.dtype.includes('DT_FLOAT')) input.dtype = 'float32';
+    if (input.dtype.includes('DT_INT') || input.dtype.includes('DT_UINT')) input.dtype = 'int32';
+    let requireAsync;
+    const t0 = process.hrtime.bigint();
+    let success = false;
+    const profile = await tf.profile(async () => {
+      const tensor = tf.zeros(input.shape, input.dtype);
+      let res;
+      if (!success) {
+        try {
+          res = model.execute(tensor);
+          success = true;
+          requireAsync = false;
+        } catch { /**/ }
+      }
+      if (!success) {
+        try {
+          res = await model.executeAsync(tensor);
+          success = true;
+          requireAsync = true;
+        } catch { /**/ }
+      }
+      tf.dispose(tensor);
+      if (Array.isArray(res)) tf.dispose(...res);
+      else tf.dispose(res);
+    });
+    const t1 = process.hrtime.bigint();
+    // eslint-disable-next-line no-return-assign
+    const kernelTime = profile ? profile.kernels.reduce((prev, curr) => prev += curr.kernelTimeMs, 0) : undefined;
+    if (success) {
+      return {
+        requireAsync,
+        wallTime: Math.round(100 * parseInt(t1 - t0) / 1000000) / 100,
+        kernelTime: Math.round(100 * kernelTime) / 100,
+        numKernels: profile?.kernels?.length,
+        peakBytes: profile?.peakBytes,
+      };
+    }
+    return { success };
+  }
+
+  const inputs = await analyzeInputs();
+  for (const input of inputs) log.blank('', input);
+  const outputs = await analyzeOutputs();
+  for (const output of outputs) log.blank('', output);
   log.info('tensors:', tf.engine().memory().numTensors);
+  log.data('topology:', await analyzeTopology());
   log.data('weights:', await analyzeWeights());
   log.data('kernel ops:', await analyzeKernelOps());
+  if (inputs && inputs[0]) log.data('execution profile:', await analyzeExecution(inputs[0]));
 }
 
 async function analyzeSaved(modelPath) {
@@ -157,12 +231,13 @@ async function main() {
   }
   const stat = fs.statSync(param);
   if (stat.isFile()) {
-    if (param.endsWith('.json')) analyzeGraph(param);
+    if (param.endsWith('.json')) await analyzeGraph(param);
   }
   if (stat.isDirectory()) {
-    if (fs.existsSync(path.join(param, '/saved_model.pb'))) analyzeSaved(param);
-    if (fs.existsSync(path.join(param, '/model.json'))) analyzeGraph(path.join(param, '/model.json'));
+    if (fs.existsSync(path.join(param, '/saved_model.pb'))) await analyzeSaved(param);
+    if (fs.existsSync(path.join(param, '/model.json'))) await analyzeGraph(path.join(param, '/model.json'));
   }
+  process.exit(0);
 }
 
 main();
