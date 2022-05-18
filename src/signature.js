@@ -149,6 +149,7 @@ async function analyzeGraph(modelPath) {
     const t0 = process.hrtime.bigint();
     let success = false;
     const profile = await tf.profile(async () => {
+      if (input.shape.length > 0) input.shape[0] = Math.abs(input.shape[0]);
       const tensor = tf.zeros(input.shape, input.dtype);
       let res;
       if (!success) {
