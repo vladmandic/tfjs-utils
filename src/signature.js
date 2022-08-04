@@ -117,7 +117,6 @@ async function analyzeGraph(modelPath) {
   async function analyzeTopology() {
     const nodes = model.artifacts?.modelTopology?.node;
     if (!nodes) return undefined;
-
     /*
     let executionOps = 0;
     const maxDepth = 100;
@@ -135,11 +134,30 @@ async function analyzeGraph(modelPath) {
     };
     walkExecutor(model.executor.graph.placeholders[0]);
     */
-
     return {
       nodes: nodes.length,
       // executionOps,
     };
+  }
+
+  function analyzeProfiling(profile) {
+    if (!profile) return [];
+    const kernels = {};
+    let total = 0;
+    for (const kernel of profile.kernels) { // sum kernel time values per kernel
+      if (kernels[kernel.name]) kernels[kernel.name] += kernel.kernelTimeMs;
+      else kernels[kernel.name] = kernel.kernelTimeMs;
+      total += kernel.kernelTimeMs;
+    }
+    const kernelArr = [];
+    Object.entries(kernels).forEach((key) => kernelArr.push({ kernel: key[0], time: key[1], perc: 0 })); // convert to array
+    for (const kernel of kernelArr) {
+      kernel.perc = Math.round(1000 * kernel.time / total) / 1000;
+      kernel.time = Math.round(1000 * kernel.time) / 1000;
+    }
+    kernelArr.sort((a, b) => b.time - a.time); // sort
+    if (kernelArr.length > 5) kernelArr.length = 5; // crop
+    return kernelArr;
   }
 
   async function analyzeExecution(input) {
@@ -173,6 +191,7 @@ async function analyzeGraph(modelPath) {
     const t1 = process.hrtime.bigint();
     // eslint-disable-next-line no-return-assign
     const kernelTime = profile ? profile.kernels.reduce((prev, curr) => prev += curr.kernelTimeMs, 0) : undefined;
+    const topKernels = analyzeProfiling(profile);
     if (success) {
       return {
         requireAsync,
@@ -180,6 +199,7 @@ async function analyzeGraph(modelPath) {
         kernelTime: Math.round(100 * kernelTime) / 100,
         numKernels: profile?.kernels?.length,
         peakBytes: profile?.peakBytes,
+        topKernels,
       };
     }
     return { success };
@@ -221,7 +241,9 @@ async function analyzeSaved(modelPath) {
 }
 
 async function main() {
-  log.options.timeStamp = false;
+  // log.options.timeStamp = false;
+  // log.options.inspect.breakLength = 300;
+  log.configure({ timeStamp: false, inspect: { breakLength: 200, compact: 3, showProxy: true } });
   const param = process.argv[2];
   if (process.argv.length !== 3) {
     log.error('path required');
