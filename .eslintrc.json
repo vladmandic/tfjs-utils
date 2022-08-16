@@ -34,6 +34,7 @@
     "no-param-reassign":"off",
     "no-plusplus": "off",
     "dot-notation": "off",
+    "no-confusing-arrow":"off",
     "no-restricted-globals": "off",
     "no-restricted-syntax": "off",
     "no-underscore-dangle": "off",

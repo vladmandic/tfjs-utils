@@ -252,8 +252,6 @@ async function analyzeSaved(modelPath) {
 }
 
 async function main() {
-  // log.options.timeStamp = false;
-  // log.options.inspect.breakLength = 300;
   log.configure({ timeStamp: false, inspect: { breakLength: 200, compact: 3, showProxy: true } });
   const param = process.argv[2];
   if (process.argv.length !== 3) {
