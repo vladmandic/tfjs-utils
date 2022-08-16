@@ -255,6 +255,7 @@ async function main() {
   const stat = fs.statSync(param);
   if (stat.isFile()) {
     if (param.endsWith('.json')) await analyzeGraph(param);
+    if (param.endsWith('.pb')) await analyzeSaved(param);
   }
   if (stat.isDirectory()) {
     if (fs.existsSync(path.join(param, '/saved_model.pb'))) await analyzeSaved(param);
