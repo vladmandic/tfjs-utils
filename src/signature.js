@@ -24,49 +24,61 @@ async function analyzeGraph(modelPath) {
   }
   if (!model) return;
   const version = model.version === 'undefined.undefined' ? undefined : model.version;
-  log.info('metadata:', { generatedBy: model.artifacts.generatedBy, convertedBy: model.artifacts.convertedBy, version });
+  log.info('metadata');
+  log.blank({ generatedBy: model.artifacts.generatedBy, convertedBy: model.artifacts.convertedBy, version });
 
   async function analyzeInputs() {
-    const inputs = [];
-    if (model.modelSignature && model.modelSignature['inputs']) {
+    const inputsSig = [];
+    if (model.modelSignature?.['inputs']) {
       log.info('model inputs based on signature');
       for (const [key, val] of Object.entries(model.modelSignature['inputs'])) {
         const shape = val.tensorShape.dim.map((a) => parseInt(a.size));
-        inputs.push({ name: key, dtype: val.dtype, shape });
+        inputsSig.push({ name: key, dtype: val.dtype, shape });
       }
-    // @ts-ignore
-    } else if (model.executor.graph['inputs']) {
+      for (const input of inputsSig) log.blank('', input);
+    } else {
+      log.warn('model inputs: no signature found');
+    }
+    const inputsExe = [];
+    if (model.executor?.graph?.['inputs']) {
       log.info('model inputs based on executor');
       // @ts-ignore
       for (const t of model.executor.graph['inputs']) {
-        inputs.push({ name: t.name, dtype: t.attrParams.dtype.value, shape: t.attrParams.shape.value });
+        inputsExe.push({ name: t.name, dtype: t.attrParams.dtype.value, shape: t.attrParams.shape.value });
       }
+      for (const input of inputsExe) log.blank('', input);
     } else {
-      log.warn('model inputs: cannot determine');
+      log.warn('model inputs: no executor data found');
     }
-    return inputs;
+    return inputsSig.length > 0 ? inputsSig : inputsExe;
   }
 
   async function analyzeOutputs() {
-    const outputs = [];
+    const outputsSig = [];
     let i = 0;
-    if (model.modelSignature && model.modelSignature['outputs'] && Object.values(model.modelSignature['outputs'])[0].dtype) {
+    if (model.modelSignature?.['outputs'] && Object.values(model.modelSignature?.['outputs'])[0]?.dtype) {
       log.info('model outputs based on signature');
       for (const [key, val] of Object.entries(model.modelSignature['outputs'])) {
         const shape = val.tensorShape?.dim.map((a) => parseInt(a.size));
-        outputs.push({ id: i++, name: key, dytpe: val.dtype, shape });
+        outputsSig.push({ id: i++, name: key, dytpe: val.dtype, shape });
       }
-    // @ts-ignore
-    } else if (model.executor.graph['outputs']) {
-      log.info('model outputs based on executor');
-      // @ts-ignore
-      for (const t of model.executor.graph['outputs']) {
-        outputs.push({ id: i++, name: t.name, dtype: t.attrParams.dtype?.value || t.rawAttrs.T.type, shape: t.attrParams.shape?.value });
-      }
+      for (const output of outputsSig) log.blank('', output);
     } else {
-      log.warn('model outputs: cannot determine');
+      log.warn('model outputs: no signature found');
     }
-    return outputs;
+    const outputsExe = [];
+    i = 0;
+    if (model.executor?.graph?.['outputs']) {
+      log.info('model outputs based on executor');
+      for (const t of model.executor.graph['outputs']) {
+        const shape = t.attrParams.shape?.value;
+        outputsExe.push({ id: i++, name: t.name, dtype: t.attrParams.dtype?.value || t.rawAttrs.T.type, shape });
+      }
+      for (const output of outputsExe) log.blank('', output);
+    } else {
+      log.warn('model outputs: no executor data found');
+    }
+    return outputsSig.length > 0 ? outputsSig : outputsExe;
   }
 
   async function analyzeKernelOps() {
@@ -164,11 +176,12 @@ async function analyzeGraph(modelPath) {
     if (input.dtype.includes('DT_FLOAT')) input.dtype = 'float32';
     if (input.dtype.includes('DT_INT') || input.dtype.includes('DT_UINT')) input.dtype = 'int32';
     let requireAsync;
-    const t0 = process.hrtime.bigint();
     let success = false;
+    const tensor = tf.randomUniform(input.shape, 0, 1, input.dtype);
+    const t0 = process.hrtime.bigint();
     const profile = await tf.profile(async () => {
       if (input.shape.length > 0) input.shape[0] = Math.abs(input.shape[0]);
-      const tensor = tf.zeros(input.shape, input.dtype);
+      // const tensor = tf.zeros(input.shape, input.dtype);
       let res;
       if (!success) {
         try {
@@ -184,18 +197,18 @@ async function analyzeGraph(modelPath) {
           requireAsync = true;
         } catch { /**/ }
       }
-      tf.dispose(tensor);
       if (Array.isArray(res)) tf.dispose(...res);
       else tf.dispose(res);
     });
     const t1 = process.hrtime.bigint();
+    tf.dispose(tensor);
     // eslint-disable-next-line no-return-assign
     const kernelTime = profile ? profile.kernels.reduce((prev, curr) => prev += curr.kernelTimeMs, 0) : undefined;
     const topKernels = analyzeProfiling(profile);
     if (success) {
       return {
         requireAsync,
-        wallTime: Math.round(100 * parseInt(t1 - t0) / 1000000) / 100,
+        wallTime: Math.round(100 * Number(t1 - t0) / 1000000) / 100,
         kernelTime: Math.round(100 * kernelTime) / 100,
         numKernels: profile?.kernels?.length,
         peakBytes: profile?.peakBytes,
@@ -206,14 +219,12 @@ async function analyzeGraph(modelPath) {
   }
 
   const inputs = await analyzeInputs();
-  for (const input of inputs) log.blank('', input);
-  const outputs = await analyzeOutputs();
-  for (const output of outputs) log.blank('', output);
+  await analyzeOutputs();
   log.info('tensors:', tf.engine().memory().numTensors);
   log.data('topology:', await analyzeTopology());
   log.data('weights:', await analyzeWeights());
   log.data('kernel ops:', await analyzeKernelOps());
-  if (inputs && inputs[0]) log.data('execution profile:', await analyzeExecution(inputs[0]));
+  for (const input of inputs) log.data('execution profile:', input, await analyzeExecution(input));
 }
 
 async function analyzeSaved(modelPath) {
@@ -255,7 +266,6 @@ async function main() {
   const stat = fs.statSync(param);
   if (stat.isFile()) {
     if (param.endsWith('.json')) await analyzeGraph(param);
-    if (param.endsWith('.pb')) await analyzeSaved(param);
   }
   if (stat.isDirectory()) {
     if (fs.existsSync(path.join(param, '/saved_model.pb'))) await analyzeSaved(param);
