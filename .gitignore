@@ -3,3 +3,4 @@ inputs/**
 outputs/**
 models/**
 pnpm-lock.yaml
+dist/tfhub-*

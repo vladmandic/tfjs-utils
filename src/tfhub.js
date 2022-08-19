@@ -24,7 +24,10 @@ const cors = {
 const parse = async (blob) => {
   const text = await blob.text();
   const stripped = text.substring(4);
-  const json = JSON.parse(stripped);
+  let json = {};
+  try {
+    json = JSON.parse(stripped);
+  } catch { /**/ }
   return json;
 };
 
@@ -40,12 +43,16 @@ async function list({ search = '', top = 10000 }) {
   const json = blob ? await parse(blob) : {};
   const models = [];
   for (const m of json[0][2][0]) {
-    models.push({
+    const model = {
       name: m[0],
-      desc: m[4],
-      meta: m[7],
+      pub: m[1],
+      desc: m[4].replace('\n', ' '),
+      dl: m[7][0],
+      meta: m[7].filter((rec) => rec)?.[2],
       tags: m[14],
-    });
+    };
+    model.url = `https://tfhub.dev/${model.pub}/${model.name}`;
+    models.push(model);
   }
   return models;
 }
@@ -55,49 +62,64 @@ async function get({ model = '' }) {
   let res;
   let blob;
   let data;
-  res = await fetch(`https://tfhub.dev/s/model/1/captain-pool/${encodeURIComponent(model)}?version=`, {
+  res = await fetch(`https://tfhub.dev/s/model/1/${model}?version=`, {
     ...cors,
     headers,
     method: 'GET',
   });
   blob = res && res.ok ? await res.blob() : undefined;
   data = blob ? await parse(blob) : {};
-  const modelDetails = {
-    details: data[0][1],
-    meta: data[0][2],
-    description: data[0][4],
-    example: data[0][6],
-    license: data[0][7],
-  };
-  res = await fetch(`https://tfhub.dev/s/listModelFormats/captain-pool/${encodeURIComponent(model)}`, {
+  let modelDetails = {};
+  if (data[0]) {
+    modelDetails = {
+      details: data[0][1],
+      meta: data[0][2],
+      description: data[0][4],
+      example: data[0][6],
+      license: data[0][7]?.[0],
+    };
+  }
+  // console.log(modelDetails);
+  res = await fetch(`https://tfhub.dev/s/listModelFormats/${model}`, {
     ...cors,
     headers,
     method: 'GET',
   });
   blob = res && res.ok ? await res.blob() : undefined;
   data = blob ? await parse(blob) : [];
-  const formatList = data[0];
-  formatList.shift();
-  return { model: modelDetails, formats: formatList[0] };
+  let formatList = {};
+  if (data[0]) {
+    formatList = data[0];
+    formatList.shift();
+  }
+  return [{ model: modelDetails, formats: formatList[0] }];
 }
 
 async function main() {
   log.configure({ inspect: { breakLength: 1024, compact: 3, showProxy: true } });
   log.options.timeStamp = false;
+  let data = [];
   switch (process.argv[2]) {
     case 'list':
-      const models = await list({});
-      models.sort((a, b) => a.name > b.name ? 1 : -1);
-      for (let i = 0; i < models.length; i++) log.blank(i, models[i]);
+      data = await list({});
       break;
     case 'search':
-      log.data(await list({ search: process.argv[3] }));
+      data = await list({ search: process.argv[3] });
+      break;
+    case 'find':
+      data = await list({});
+      data = data.filter((m) => JSON.stringify(m).toLowerCase().includes(process.argv[3]));
       break;
     case 'get':
-      log.data(await get({ model: process.argv[3] }));
+      data = await get({ model: process.argv[3] });
       break;
     default:
-      log.error('usage: tfhub <list|search|get>');
+      log.error('usage: tfhub <list|search|find|get|details>');
+  }
+  if (data && data.length > 0) {
+    if (data.name) data.sort((a, b) => a.name > b.name ? 1 : -1);
+    for (let i = 0; i < data.length; i++) log.blank(data[i]);
+    log.info({ records: data.length });
   }
 }
 

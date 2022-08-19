@@ -8,14 +8,9 @@ collection of generic js utils when working with tf models
 - `classifier.js`: generic tf image classifier
 - `detector.js`: generic tf object detector
 - `freeze.py`: convert tf frozen model to saved model
+- `tfbun.js`: list/search models on <tfhub.com>
 - `kernels.js`: generate html table of supported tfjs kernels per backend
-
-## other
-
-- `tfjs`: custom built tfjs esm modules  
-  moved to `vladmandic/tfjs`
-- `/server/serve.js` lightweight http/https server with built-in watcher and built toolchain  
-  integrated into `vladmandic/build`
+- `tfinfo.py`: get cuda & gpu info
 
 ## classes
 
