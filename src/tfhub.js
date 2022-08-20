@@ -1,3 +1,4 @@
+const fs = require('fs');
 const process = require('process');
 const log = require('@vladmandic/pilogger');
 
@@ -79,7 +80,6 @@ async function get({ model = '' }) {
       license: data[0][7]?.[0],
     };
   }
-  // console.log(modelDetails);
   res = await fetch(`https://tfhub.dev/s/listModelFormats/${model}`, {
     ...cors,
     headers,
@@ -95,6 +95,25 @@ async function get({ model = '' }) {
   return [{ model: modelDetails, formats: formatList[0] }];
 }
 
+async function compare({ newList, file }) {
+  if (!fs.existsSync(file)) {
+    log.error('file does not exist', file);
+    return [];
+  }
+  const bytes = fs.readFileSync(file);
+  const json = JSON.parse(bytes);
+  log.info({ current: newList.length, previous: json.length });
+  const modelsOld = json.map((m) => m.name);
+  const modelsNew = newList.map((m) => m.name);
+  const lst = [];
+  for (const model of modelsNew) {
+    if (!modelsOld.includes(model)) {
+      lst.push(newList.find((m) => m.name === model));
+    }
+  }
+  return lst;
+}
+
 async function main() {
   log.configure({ inspect: { breakLength: 1024, compact: 3, showProxy: true } });
   log.options.timeStamp = false;
@@ -102,6 +121,21 @@ async function main() {
   switch (process.argv[2]) {
     case 'list':
       data = await list({});
+      break;
+    case 'write':
+      data = await list({});
+      for (let i = 0; i < data.length; i++) {
+        const details = await get({ model: `${data[i].pub}/${data[i].name}` });
+        data[i].size = details[0].model?.meta?.[7] || 0;
+        data[i].details = details[0].model;
+        data[i].formats = details[0].formats;
+      }
+      fs.writeFileSync(process.argv[3], JSON.stringify(data));
+      break;
+    case 'read':
+      const bytes = fs.readFileSync(process.argv[3]);
+      const json = JSON.parse(bytes);
+      data = json.sort((a, b) => a.size - b.size).map((m) => ({ name: `${m.pub}/${m.name}`, size: m.size, tag: m.tags }));
       break;
     case 'search':
       data = await list({ search: process.argv[3] });
@@ -113,11 +147,16 @@ async function main() {
     case 'get':
       data = await get({ model: process.argv[3] });
       break;
+    case 'compare':
+      const newList = await list({});
+      data = await compare({ newList, file: process.argv[3] });
+      break;
     default:
       log.error('usage: tfhub <list|search|find|get|details>');
   }
   if (data && data.length > 0) {
-    if (data.name) data.sort((a, b) => a.name > b.name ? 1 : -1);
+    if (data[0].name) data.sort((a, b) => a.name > b.name ? 1 : -1);
+    if (data[0].size) data.sort((a, b) => a.size > b.size ? 1 : -1);
     for (let i = 0; i < data.length; i++) log.blank(data[i]);
     log.info({ records: data.length });
   }
