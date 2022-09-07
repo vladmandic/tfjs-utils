@@ -152,7 +152,7 @@ async function main() {
       data = await compare({ newList, file: process.argv[3] });
       break;
     default:
-      log.error('usage: tfhub <list|search|find|get|details>');
+      log.error('usage: tfhub <list|search|find|get|details|compare>');
   }
   if (data && data.length > 0) {
     if (data[0].name) data.sort((a, b) => a.name > b.name ? 1 : -1);

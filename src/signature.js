@@ -177,10 +177,10 @@ async function analyzeGraph(modelPath) {
     if (input.dtype.includes('DT_INT') || input.dtype.includes('DT_UINT')) input.dtype = 'int32';
     let requireAsync;
     let success = false;
+    if (input.shape.length > 0) input.shape[0] = Math.abs(input.shape[0]);
     const tensor = tf.randomUniform(input.shape, 0, 1, input.dtype);
     const t0 = process.hrtime.bigint();
     const profile = await tf.profile(async () => {
-      if (input.shape.length > 0) input.shape[0] = Math.abs(input.shape[0]);
       // const tensor = tf.zeros(input.shape, input.dtype);
       let res;
       if (!success) {
