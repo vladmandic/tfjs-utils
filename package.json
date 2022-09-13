@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node --trace-warnings --trace-uncaught --unhandled-rejections=warn --stack-trace-limit=50 --no-deprecation ./detector.js",
-    "kernels": "esbuild --bundle --format=esm --minify --platform=browser --target=esnext --outfile=dist/kernels.esm.js src/kernels.ts"
+    "kernels": "esbuild --bundle --format=esm --minify --platform=browser --target=esnext --outfile=dist/kernels.esm.js src/kernels.ts",
+    "serve": "build --profile serve"
   },
   "author": "Vladimir Mandic <mandic00@live.com>",
   "license": "MIT",

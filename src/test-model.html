@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>TFJS Graph Model Test</title>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, shrink-to-fit=yes">
+  </head>
+  <body style="font-size: 12px; margin: 0; background: black; color: white; width: 100vw; line-height: 200%">
+    <pre id="log"></pre>
+    <script type="module">
+      import * as tf from '../dist/tfjs.esm.js'
+
+      const modelUrl = '../web_model_lego/model.json'
+      async function log(msg) {
+        document.getElementById('log').innerHTML += (typeof msg === 'object' ? JSON.stringify(msg, null, 0) : msg) + '<br>';
+        console.log(msg);
+      }
+
+      async function main() {
+        tf.setBackend('webgl');
+        await tf.ready();
+        log({ tfjs: tf.version.tfjs, backend: tf.getBackend() });
+        const model = await tf.loadGraphModel(modelUrl);
+        log({ model: model.modelUrl, inputs: model.inputs, outputs: model.outputs });
+        const input = tf.randomUniform([1, 256, 256, 3], 0, 255, 'int32');
+        const res = await model.executeAsync(input);
+        log({ res });
+      }
+
+      window.onload = main;
+    </script>
+  </body>
+</html>

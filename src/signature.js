@@ -178,6 +178,10 @@ async function analyzeGraph(modelPath) {
     let requireAsync;
     let success = false;
     if (input.shape.length > 0) input.shape[0] = Math.abs(input.shape[0]);
+    if (input.shape.length >= 3) {
+      if (input.shape[1] <= 0) input.shape[1] = 512;
+      if (input.shape[2] <= 0) input.shape[2] = 512;
+    }
     const tensor = tf.randomUniform(input.shape, 0, 1, input.dtype);
     const t0 = process.hrtime.bigint();
     const profile = await tf.profile(async () => {
