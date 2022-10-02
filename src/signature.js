@@ -32,7 +32,7 @@ async function analyzeGraph(modelPath) {
     if (model.modelSignature?.['inputs']) {
       log.info('model inputs based on signature');
       for (const [key, val] of Object.entries(model.modelSignature['inputs'])) {
-        const shape = val.tensorShape.dim.map((a) => parseInt(a.size));
+        const shape = val.tensorShape.dim?.map((a) => parseInt(a.size));
         inputsSig.push({ name: key, dtype: val.dtype, shape });
       }
       for (const input of inputsSig) log.blank('', input);
@@ -177,12 +177,12 @@ async function analyzeGraph(modelPath) {
     if (input.dtype.includes('DT_INT') || input.dtype.includes('DT_UINT')) input.dtype = 'int32';
     let requireAsync;
     let success = false;
-    if (input.shape.length > 0) input.shape[0] = Math.abs(input.shape[0]);
-    if (input.shape.length >= 3) {
+    if (input.shape?.length > 0) input.shape[0] = Math.abs(input.shape[0]);
+    if (input.shape?.length >= 3) {
       if (input.shape[1] <= 0) input.shape[1] = 512;
       if (input.shape[2] <= 0) input.shape[2] = 512;
     }
-    const tensor = tf.randomUniform(input.shape, 0, 1, input.dtype);
+    const tensor = tf.randomUniform(input.shape || [0], 0, 1, input.dtype);
     const t0 = process.hrtime.bigint();
     const profile = await tf.profile(async () => {
       // const tensor = tf.zeros(input.shape, input.dtype);
